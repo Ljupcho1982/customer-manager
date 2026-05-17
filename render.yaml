@@ -1,0 +1,29 @@
+databases:
+  - name: customer-manager-db
+    plan: free
+    databaseName: customermanager
+    user: customermanager
+    ipAllowList: []   # private connections only
+
+services:
+  - type: web
+    name: customer-manager
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: customer-manager-db
+          property: connectionString
+      # SMTP — set these in the Render dashboard ("Environment" tab) after first deploy.
+      - key: Smtp__Username
+        sync: false
+      - key: Smtp__Password
+        sync: false
+      - key: Smtp__FromAddress
+        sync: false

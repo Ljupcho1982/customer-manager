@@ -1,0 +1,32 @@
+## .NET
+bin/
+obj/
+out/
+*.user
+*.suo
+*.userprefs
+.vs/
+
+## IDE
+.vscode/
+.idea/
+
+## Local secrets — keep dev SMTP password out of source control
+appsettings.Development.json
+appsettings.*.local.json
+secrets.json
+**/UserSecrets/
+
+## OS junk
+.DS_Store
+Thumbs.db
+
+## Logs
+*.log
+logs/
+
+## Docker volumes
+pgdata/
+
+## Local docs that don't belong in the deployed image
+# (leave the project's design docs in place; ignore generated summaries if any)
