@@ -9,6 +9,7 @@ using blazor_project.Services.Customers;
 using blazor_project.Services.Interfaces;
 using blazor_project.Validators;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -63,6 +64,15 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLogging();
 
+// When hosted behind a reverse proxy (Render, etc.) honor the X-Forwarded-* headers
+// so Request.IsHttps / RemoteIpAddress reflect the original client request.
+builder.Services.Configure<ForwardedHeadersOptions>(opts =>
+{
+    opts.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    opts.KnownIPNetworks.Clear();
+    opts.KnownProxies.Clear();
+});
+
 // Bind to $PORT (Render/Heroku/etc convention) if set; otherwise use the launch profile.
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
@@ -71,6 +81,9 @@ if (!string.IsNullOrEmpty(port))
 }
 
 var app = builder.Build();
+
+// Trust the reverse proxy's headers (must run before auth/redirect middleware).
+app.UseForwardedHeaders();
 
 // Ensure the database exists (dev convenience – use migrations for production).
 using (var scope = app.Services.CreateScope())
