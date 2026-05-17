@@ -1,0 +1,143 @@
+@page "/register"
+@layout EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using blazor_project.Models.Domain
+@inject UserManager<ApplicationUser> UserManager
+@inject IEmailSender<ApplicationUser> EmailSender
+@inject NavigationManager Navigation
+@inject ILogger<Register> Logger
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <h1 class="h3 mb-3 fw-bold">Create Account</h1>
+            <p class="text-muted">Join Customer Manager</p>
+        </div>
+
+        @if (Sent)
+        {
+            <div class="alert alert-success" role="alert">
+                <strong>Check your email!</strong> We sent a confirmation link to
+                <strong>@Input.Email</strong>. Click the link to activate your account.
+            </div>
+            <a href="/login" class="btn btn-outline-primary w-100">Back to sign in</a>
+        }
+        else
+        {
+            <EditForm Model="Input" FormName="register" method="post" OnValidSubmit="HandleRegister">
+                <DataAnnotationsValidator />
+
+                @if (!string.IsNullOrEmpty(ErrorMessage))
+                {
+                    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+                }
+
+                <div class="mb-3">
+                    <label for="firstName" class="form-label fw-600">First Name *</label>
+                    <InputText id="firstName" class="form-control" @bind-Value="Input.FirstName" />
+                    <ValidationMessage For="() => Input.FirstName" class="text-danger small mt-1" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="lastName" class="form-label fw-600">Last Name *</label>
+                    <InputText id="lastName" class="form-control" @bind-Value="Input.LastName" />
+                    <ValidationMessage For="() => Input.LastName" class="text-danger small mt-1" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="email" class="form-label fw-600">Email *</label>
+                    <InputText id="email" type="email" class="form-control" @bind-Value="Input.Email" />
+                    <ValidationMessage For="() => Input.Email" class="text-danger small mt-1" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label fw-600">Password *</label>
+                    <InputText id="password" type="password" class="form-control" @bind-Value="Input.Password" />
+                    <ValidationMessage For="() => Input.Password" class="text-danger small mt-1" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="confirmPassword" class="form-label fw-600">Confirm Password *</label>
+                    <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="Input.ConfirmPassword" />
+                    <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger small mt-1" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Create Account</button>
+            </EditForm>
+
+            <hr class="my-4" />
+
+            <div class="text-center">
+                <p class="text-muted small mb-0">
+                    Already have an account?
+                    <a href="/login" class="text-decoration-none fw-bold">Sign In</a>
+                </p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm] public RegisterInput Input { get; set; } = default!;
+    private string? ErrorMessage;
+    private bool Sent;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task HandleRegister()
+    {
+        if (Input.Password != Input.ConfirmPassword)
+        {
+            ErrorMessage = "Passwords do not match";
+            return;
+        }
+
+        var user = new ApplicationUser
+        {
+            UserName = Input.Email,
+            Email = Input.Email,
+            FirstName = Input.FirstName,
+            LastName = Input.LastName
+        };
+
+        var result = await UserManager.CreateAsync(user, Input.Password);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = string.Join(" ", result.Errors.Select(e => e.Description));
+            return;
+        }
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        var encodedCode = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var callbackUrl = Navigation.GetUriWithQueryParameters(
+            Navigation.ToAbsoluteUri("/confirm-email").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = encodedCode });
+
+        try
+        {
+            await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed sending confirmation email");
+            ErrorMessage = "Account created, but the confirmation email failed to send. Contact support.";
+            return;
+        }
+
+        Sent = true;
+    }
+
+    public sealed class RegisterInput
+    {
+        [Required] public string FirstName { get; set; } = string.Empty;
+        [Required] public string LastName { get; set; } = string.Empty;
+        [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+        [Required, StringLength(100, MinimumLength = 6)] public string Password { get; set; } = string.Empty;
+        [Required, Compare(nameof(Password))] public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

@@ -1,0 +1,171 @@
+@page "/customers/{CustomerId:int}"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ICustomerService CustomerService
+@inject NavigationManager Navigation
+@inject INotificationService Notification
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <a href="/customers" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-2"></i>
+                Back to Customers
+            </a>
+        </div>
+        <div class="col text-end">
+            <button class="btn btn-warning btn-sm me-2" @onclick="EditCustomer">
+                <i class="fas fa-edit me-2"></i>
+                Edit
+            </button>
+            <button class="btn btn-danger btn-sm" @onclick="ShowDeleteConfirm">
+                <i class="fas fa-trash me-2"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (Customer != null)
+    {
+        <div class="card">
+            <div class="card-header bg-light">
+                <h4 class="card-title mb-0">@Customer.FullName</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Email:</dt>
+                            <dd class="col-sm-8">@Customer.Email</dd>
+
+                            <dt class="col-sm-4">Phone:</dt>
+                            <dd class="col-sm-8">@(Customer.PhoneNumber ?? "N/A")</dd>
+
+                            <dt class="col-sm-4">Address:</dt>
+                            <dd class="col-sm-8">@(Customer.Address ?? "N/A")</dd>
+
+                            <dt class="col-sm-4">City:</dt>
+                            <dd class="col-sm-8">@(Customer.City ?? "N/A")</dd>
+
+                            <dt class="col-sm-4">State:</dt>
+                            <dd class="col-sm-8">@(Customer.State ?? "N/A")</dd>
+                        </dl>
+                    </div>
+                    <div class="col-md-6">
+                        <dl class="row">
+                            <dt class="col-sm-4">Postal Code:</dt>
+                            <dd class="col-sm-8">@(Customer.PostalCode ?? "N/A")</dd>
+
+                            <dt class="col-sm-4">Country:</dt>
+                            <dd class="col-sm-8">@(Customer.Country ?? "N/A")</dd>
+
+                            <dt class="col-sm-4">Status:</dt>
+                            <dd class="col-sm-8">
+                                <span class="badge bg-@GetStatusColor(Customer.Status)">
+                                    @Customer.Status
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-4">Created:</dt>
+                            <dd class="col-sm-8">@Customer.CreatedDate.ToString("g")</dd>
+
+                            <dt class="col-sm-4">Updated:</dt>
+                            <dd class="col-sm-8">@Customer.UpdatedDate.ToString("g")</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning" role="alert">
+            Customer not found.
+        </div>
+    }
+</div>
+
+<ConfirmDialog @ref="ConfirmDialogRef"
+    Title="Delete Customer"
+    Message="@($"Are you sure you want to delete '{Customer?.FullName}'? This action cannot be undone.")"
+    ConfirmButtonText="Delete"
+    OnConfirm="HandleDelete" />
+
+@code {
+    [Parameter]
+    public int CustomerId { get; set; }
+
+    private CustomerDto? Customer;
+    private bool IsLoading = false;
+    private ConfirmDialog? ConfirmDialogRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomer();
+    }
+
+    private async Task LoadCustomer()
+    {
+        IsLoading = true;
+        try
+        {
+            var response = await CustomerService.GetCustomerById(CustomerId);
+            if (response.Success)
+            {
+                Customer = response.Data;
+            }
+            else
+            {
+                Notification.ShowError("Customer not found");
+                Navigation.NavigateTo("/customers");
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Active" => "success",
+            "Inactive" => "warning",
+            "Archived" => "secondary",
+            _ => "info"
+        };
+    }
+
+    private void ShowDeleteConfirm()
+    {
+        ConfirmDialogRef?.Show();
+    }
+
+    private void EditCustomer()
+    {
+        Navigation.NavigateTo($"/customers/{CustomerId}/edit");
+    }
+
+    private async Task HandleDelete()
+    {
+        var result = await CustomerService.DeleteCustomer(CustomerId);
+        if (result.Success)
+        {
+            Notification.ShowSuccess("Customer deleted successfully");
+            Navigation.NavigateTo("/customers");
+        }
+        else
+        {
+            Notification.ShowError(result.Message);
+        }
+    }
+}

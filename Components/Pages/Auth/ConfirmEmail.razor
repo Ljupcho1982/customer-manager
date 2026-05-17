@@ -1,0 +1,67 @@
+@page "/confirm-email"
+@layout EmptyLayout
+@using System.Text
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using blazor_project.Models.Domain
+@inject UserManager<ApplicationUser> UserManager
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <h1 class="h3 mb-3 fw-bold">Email Confirmation</h1>
+        </div>
+
+        <div class="alert alert-@(Success ? "success" : "danger")" role="alert">
+            @StatusMessage
+        </div>
+
+        <a href="/login" class="btn btn-primary w-100">Continue to sign in</a>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? UserId { get; set; }
+    [SupplyParameterFromQuery] public string? Code { get; set; }
+
+    private bool Success;
+    private string StatusMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(Code))
+        {
+            StatusMessage = "Invalid confirmation link.";
+            return;
+        }
+
+        var user = await UserManager.FindByIdAsync(UserId);
+        if (user is null)
+        {
+            StatusMessage = "Account not found.";
+            return;
+        }
+
+        string decoded;
+        try
+        {
+            decoded = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+        }
+        catch
+        {
+            StatusMessage = "Invalid confirmation code.";
+            return;
+        }
+
+        var result = await UserManager.ConfirmEmailAsync(user, decoded);
+        if (result.Succeeded)
+        {
+            Success = true;
+            StatusMessage = "Your email is confirmed. You can now sign in.";
+        }
+        else
+        {
+            StatusMessage = "Email confirmation failed. The link may have expired.";
+        }
+    }
+}

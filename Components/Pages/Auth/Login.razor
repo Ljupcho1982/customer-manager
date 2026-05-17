@@ -1,0 +1,106 @@
+@page "/login"
+@layout EmptyLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using blazor_project.Models.Domain
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Navigation
+@inject IHttpContextAccessor HttpContextAccessor
+@inject ILogger<Login> Logger
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="text-center mb-4">
+            <h1 class="h3 mb-3 fw-bold">Customer Manager</h1>
+            <p class="text-muted">Welcome Back</p>
+        </div>
+
+        <EditForm Model="Input" FormName="login" method="post" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+            }
+
+            <div class="mb-3">
+                <label for="email" class="form-label fw-600">Email Address *</label>
+                <InputText id="email" class="form-control" @bind-Value="Input.Email" />
+                <ValidationMessage For="() => Input.Email" class="text-danger small mt-1" />
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label fw-600">Password *</label>
+                <InputText id="password" type="password" class="form-control" @bind-Value="Input.Password" />
+                <ValidationMessage For="() => Input.Password" class="text-danger small mt-1" />
+            </div>
+
+            <div class="mb-3 form-check">
+                <InputCheckbox id="rememberMe" class="form-check-input" @bind-Value="Input.RememberMe" />
+                <label class="form-check-label" for="rememberMe">Remember me</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100">Sign In</button>
+        </EditForm>
+
+        <hr class="my-4" />
+
+        <div class="text-center">
+            <p class="text-muted small mb-0">
+                Don't have an account?
+                <a href="/register" class="text-decoration-none fw-bold">Sign Up</a>
+            </p>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm] public LoginInput Input { get; set; } = default!;
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private string? ErrorMessage;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task HandleLogin()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User {Email} signed in", Input.Email);
+            Navigation.NavigateTo(string.IsNullOrWhiteSpace(ReturnUrl) ? "/customers" : ReturnUrl);
+            return;
+        }
+
+        if (result.IsNotAllowed)
+        {
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            if (user is not null && !await UserManager.IsEmailConfirmedAsync(user))
+            {
+                ErrorMessage = "Please confirm your email before signing in. Check your inbox for the confirmation link.";
+                return;
+            }
+            ErrorMessage = "Sign-in is not allowed.";
+            return;
+        }
+
+        if (result.IsLockedOut)
+        {
+            ErrorMessage = "Account locked. Try again later.";
+            return;
+        }
+
+        ErrorMessage = "Invalid email or password.";
+    }
+
+    public sealed class LoginInput
+    {
+        [Required, EmailAddress] public string Email { get; set; } = string.Empty;
+        [Required] public string Password { get; set; } = string.Empty;
+        public bool RememberMe { get; set; }
+    }
+}

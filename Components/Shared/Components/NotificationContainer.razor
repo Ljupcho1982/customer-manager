@@ -1,0 +1,62 @@
+@namespace blazor_project.Components.Shared.Components
+@using blazor_project.Services
+
+@if (Notifications.Any())
+{
+    <div class="notification-container">
+        @foreach (var notification in Notifications)
+        {
+            <div class="alert alert-@notification.Type alert-dismissible fade show" role="alert">
+                <span>@notification.Message</span>
+                <button type="button" class="btn-close" @onclick="() => RemoveNotification(notification.Id)"></button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Inject]
+    private INotificationService NotificationService { get; set; } = null!;
+
+    private List<NotificationItem> Notifications { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        if (NotificationService is NotificationService ns)
+        {
+            ns.OnNotification += (message, type) => AddNotification(message, type);
+        }
+    }
+
+    private void AddNotification(string message, string type)
+    {
+        var notification = new NotificationItem
+        {
+            Id = Guid.NewGuid(),
+            Message = message,
+            Type = type
+        };
+
+        Notifications.Add(notification);
+        StateHasChanged();
+
+        // Auto-dismiss after 3 seconds for success and info
+        if (type == "success" || type == "info")
+        {
+            Task.Delay(3000).ContinueWith(_ => RemoveNotification(notification.Id));
+        }
+    }
+
+    private void RemoveNotification(Guid id)
+    {
+        Notifications.RemoveAll(n => n.Id == id);
+        StateHasChanged();
+    }
+
+    private class NotificationItem
+    {
+        public Guid Id { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string Type { get; set; } = "info";
+    }
+}

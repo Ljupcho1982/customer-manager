@@ -1,0 +1,75 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="page">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-users me-2"></i>
+                Customer Manager
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <AuthorizeView>
+                        <Authorized>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/dashboard">
+                                    <i class="fas fa-home me-1"></i> Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/customers">
+                                    <i class="fas fa-users me-1"></i> Customers
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <span class="nav-link text-light-emphasis">
+                                    <i class="fas fa-user-circle me-1"></i> @context.User.Identity?.Name
+                                </span>
+                            </li>
+                            <li class="nav-item">
+                                <form method="post" action="/logout" class="d-inline">
+                                    <AntiforgeryToken />
+                                    <button type="submit" class="btn btn-outline-light btn-sm ms-2">
+                                        <i class="fas fa-sign-out-alt me-1"></i> Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </Authorized>
+                        <NotAuthorized>
+                            <li class="nav-item"><a class="nav-link" href="/login">Sign In</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/register">Sign Up</a></li>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="py-4">
+        <div class="container-fluid">
+            @Body
+        </div>
+    </main>
+</div>
+
+<NotificationContainer @rendermode="InteractiveServer" />
+
+<div id="blazor-error-ui" data-nosnippet>
+    <div class="alert alert-danger" role="alert">
+        An unhandled error has occurred.
+        <a href="." class="btn btn-warning btn-sm ms-2">Reload</a>
+        <button class="btn-close" data-dismiss="alert"></button>
+    </div>
+</div>
+
+@code {
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        await Task.CompletedTask;
+    }
+}

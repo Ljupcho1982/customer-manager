@@ -1,0 +1,219 @@
+@page "/customers"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ICustomerService CustomerService
+@inject NavigationManager Navigation
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h2">Customers</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-primary" @onclick="@(() => Navigation.NavigateTo("/customers/new"))">
+                <i class="fas fa-plus me-2"></i>
+                New Customer
+            </button>
+        </div>
+    </div>
+
+    <SearchBar OnSearch="HandleSearch" />
+
+    @if (IsLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (Customers.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th @onclick='() => SortBy("FirstName")' style="cursor: pointer;">
+                            Name @GetSortIndicator("FirstName")
+                        </th>
+                        <th @onclick='() => SortBy("Email")' style="cursor: pointer;">
+                            Email @GetSortIndicator("Email")
+                        </th>
+                        <th @onclick='() => SortBy("City")' style="cursor: pointer;">
+                            City @GetSortIndicator("City")
+                        </th>
+                        <th @onclick='() => SortBy("Status")' style="cursor: pointer;">
+                            Status @GetSortIndicator("Status")
+                        </th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var customer in Customers)
+                    {
+                        <tr>
+                            <td>@customer.FullName</td>
+                            <td>@customer.Email</td>
+                            <td>@(customer.City ?? "N/A")</td>
+                            <td>
+                                <span class="badge bg-@GetStatusColor(customer.Status)">
+                                    @customer.Status
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewCustomer(customer.CustomerId)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" @onclick="() => EditCustomer(customer.CustomerId)">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDelete(customer.CustomerId, customer.FullName)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <Pagination 
+            PageNumber="CurrentSearch.PageNumber"
+            PageSize="CurrentSearch.PageSize"
+            TotalCount="TotalCount"
+            OnPageChanged="ChangePage"
+            OnPageSizeChanged="ChangePageSize" />
+    }
+    else
+    {
+        <div class="alert alert-info" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            No customers found. Create your first customer to get started.
+        </div>
+    }
+</div>
+
+<ConfirmDialog @ref="ConfirmDialogRef" 
+    Title="Delete Customer"
+    Message="@ConfirmMessage"
+    ConfirmButtonText="Delete"
+    OnConfirm="HandleDelete" />
+
+@code {
+    [Inject]
+    private INotificationService Notification { get; set; } = null!;
+
+    private List<CustomerDto> Customers = new();
+    private SearchCriteria CurrentSearch = new();
+    private int TotalCount = 0;
+    private bool IsLoading = false;
+    private int CustomerToDelete = 0;
+    private string ConfirmMessage = "";
+    private ConfirmDialog? ConfirmDialogRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCustomers();
+    }
+
+    private async Task LoadCustomers()
+    {
+        IsLoading = true;
+        try
+        {
+            var response = await CustomerService.SearchCustomers(CurrentSearch);
+            Customers = response.Items;
+            TotalCount = response.TotalCount;
+        }
+        catch (Exception)
+        {
+            Notification.ShowError("Failed to load customers");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task HandleSearch(SearchCriteria criteria)
+    {
+        CurrentSearch = criteria;
+        await LoadCustomers();
+    }
+
+    private async Task ChangePage(int pageNumber)
+    {
+        CurrentSearch.PageNumber = pageNumber;
+        await LoadCustomers();
+    }
+
+    private async Task ChangePageSize(int pageSize)
+    {
+        CurrentSearch.PageSize = pageSize;
+        CurrentSearch.PageNumber = 1;
+        await LoadCustomers();
+    }
+
+    private async Task SortBy(string column)
+    {
+        if (CurrentSearch.SortBy == column)
+        {
+            CurrentSearch.Ascending = !CurrentSearch.Ascending;
+        }
+        else
+        {
+            CurrentSearch.SortBy = column;
+            CurrentSearch.Ascending = false;
+        }
+        CurrentSearch.PageNumber = 1;
+        await LoadCustomers();
+    }
+
+    private string GetSortIndicator(string column)
+    {
+        if (CurrentSearch.SortBy != column) return "";
+        return CurrentSearch.Ascending ? "▲" : "▼";
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Active" => "success",
+            "Inactive" => "warning",
+            "Archived" => "secondary",
+            _ => "info"
+        };
+    }
+
+    private void ViewCustomer(int id)
+    {
+        Navigation.NavigateTo($"/customers/{id}");
+    }
+
+    private void EditCustomer(int id)
+    {
+        Navigation.NavigateTo($"/customers/{id}/edit");
+    }
+
+    private void ConfirmDelete(int id, string name)
+    {
+        CustomerToDelete = id;
+        ConfirmMessage = $"Are you sure you want to delete '{name}'? This action cannot be undone.";
+        ConfirmDialogRef?.Show();
+    }
+
+    private async Task HandleDelete()
+    {
+        var result = await CustomerService.DeleteCustomer(CustomerToDelete);
+        if (result.Success)
+        {
+            Notification.ShowSuccess("Customer deleted successfully");
+            await LoadCustomers();
+        }
+        else
+        {
+            Notification.ShowError(result.Message);
+        }
+    }
+}

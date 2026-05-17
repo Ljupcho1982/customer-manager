@@ -1,0 +1,220 @@
+@page "/customers/new"
+@page "/customers/{CustomerId:int}/edit"
+@rendermode InteractiveServer
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject ICustomerService CustomerService
+@inject NavigationManager Navigation
+@inject INotificationService Notification
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1 class="h2">@(IsEditMode ? "Edit Customer" : "New Customer")</h1>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            @if (IsLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <EditForm Model="Model" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="firstName" class="form-label">First Name *</label>
+                            <InputText id="firstName" class="form-control" @bind-Value="Model.FirstName" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.FirstName" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="lastName" class="form-label">Last Name *</label>
+                            <InputText id="lastName" class="form-control" @bind-Value="Model.LastName" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.LastName" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email *</label>
+                            <InputText id="email" type="email" class="form-control" @bind-Value="Model.Email" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.Email" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Phone</label>
+                            <InputText id="phone" class="form-control" @bind-Value="Model.PhoneNumber" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.PhoneNumber" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address</label>
+                        <InputText id="address" class="form-control" @bind-Value="Model.Address" disabled="@IsSubmitting" />
+                        <ValidationMessage For="() => Model.Address" />
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="city" class="form-label">City</label>
+                            <InputText id="city" class="form-control" @bind-Value="Model.City" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.City" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="state" class="form-label">State</label>
+                            <InputText id="state" class="form-control" @bind-Value="Model.State" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.State" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="postalCode" class="form-label">Postal Code</label>
+                            <InputText id="postalCode" class="form-control" @bind-Value="Model.PostalCode" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.PostalCode" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="country" class="form-label">Country</label>
+                            <InputText id="country" class="form-control" @bind-Value="Model.Country" disabled="@IsSubmitting" />
+                            <ValidationMessage For="() => Model.Country" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <InputSelect id="status" class="form-select" @bind-Value="Model.Status" disabled="@IsSubmitting">
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                                <option value="Archived">Archived</option>
+                            </InputSelect>
+                            <ValidationMessage For="() => Model.Status" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@IsSubmitting">
+                            @if (IsSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save</span>
+                            }
+                        </button>
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel" disabled="@IsSubmitting">
+                            Cancel
+                        </button>
+                    </div>
+                </EditForm>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public int? CustomerId { get; set; }
+
+    private CreateCustomerRequest Model = new();
+    private bool IsEditMode => CustomerId.HasValue;
+    private bool IsLoading = false;
+    private bool IsSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode && CustomerId.HasValue)
+        {
+            IsLoading = true;
+            try
+            {
+                var response = await CustomerService.GetCustomerById(CustomerId.Value);
+                if (response.Success && response.Data != null)
+                {
+                    var dto = response.Data;
+                    Model = new CreateCustomerRequest
+                    {
+                        FirstName = dto.FirstName,
+                        LastName = dto.LastName,
+                        Email = dto.Email,
+                        PhoneNumber = dto.PhoneNumber,
+                        Address = dto.Address,
+                        City = dto.City,
+                        State = dto.State,
+                        PostalCode = dto.PostalCode,
+                        Country = dto.Country,
+                        Status = dto.Status
+                    };
+                }
+                else
+                {
+                    Notification.ShowError("Customer not found");
+                    Navigation.NavigateTo("/customers");
+                }
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        IsSubmitting = true;
+        try
+        {
+            ApiResponse<CustomerDto> result;
+
+            if (IsEditMode && CustomerId.HasValue)
+            {
+                var updateRequest = new UpdateCustomerRequest
+                {
+                    FirstName = Model.FirstName,
+                    LastName = Model.LastName,
+                    Email = Model.Email,
+                    PhoneNumber = Model.PhoneNumber,
+                    Address = Model.Address,
+                    City = Model.City,
+                    State = Model.State,
+                    PostalCode = Model.PostalCode,
+                    Country = Model.Country,
+                    Status = Model.Status
+                };
+                result = await CustomerService.UpdateCustomer(CustomerId.Value, updateRequest);
+            }
+            else
+            {
+                result = await CustomerService.CreateCustomer(Model);
+            }
+
+            if (result.Success)
+            {
+                Notification.ShowSuccess(result.Message);
+                Navigation.NavigateTo("/customers");
+            }
+            else
+            {
+                Notification.ShowError(result.Message);
+            }
+        }
+        catch (Exception)
+        {
+            Notification.ShowError("An error occurred");
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/customers");
+    }
+}
