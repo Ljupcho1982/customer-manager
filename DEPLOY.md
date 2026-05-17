@@ -43,19 +43,27 @@ git push -u origin main
 4. Render reads `render.yaml`, shows a preview of the database + web service, click **Apply**
 5. Wait 3–5 min for the first build (subsequent commits auto-deploy in ~1–2 min)
 
-### 3. Add the SMTP secrets
+### 3. Set up SendGrid (for email — Render's free tier blocks outbound SMTP)
 
-After the first deploy completes:
+Render free tier blocks ports 25/465/587 to prevent spam abuse, so Gmail SMTP doesn't work. SendGrid's HTTP API does (it's plain HTTPS).
 
-1. In the Render dashboard, open the **customer-manager** service
-2. Go to **Environment**
-3. Fill in the three placeholders (they were declared with `sync: false` so Render didn't generate them):
-   - `Smtp__Username` → `ljupco.semov@gmail.com`
-   - `Smtp__Password` → your 16-char Gmail App Password (`ctlrogjddkzllwfh`)
-   - `Smtp__FromAddress` → `ljupco.semov@gmail.com`
-4. Click **Save Changes** — Render restarts the service automatically
+1. Sign up free at <https://signup.sendgrid.com> (no credit card, 100 emails/day free)
+2. **Verify your sender email**:
+   - Dashboard → **Settings** → **Sender Authentication** → **Verify a Single Sender**
+   - Use `ljupco.semov@gmail.com` (or another address you control). SendGrid emails you a confirmation link — click it.
+3. **Create an API key**:
+   - **Settings** → **API Keys** → **Create API Key**
+   - Name it anything (e.g. "customer-manager"), choose **Restricted Access** → enable **Mail Send: Full Access** → **Create & View**
+   - Copy the key (starts with `SG.`). You only see it once.
+4. **Add the secrets to Render**:
+   - In the Render dashboard, open the **customer-manager** service → **Environment**
+   - Fill in the three placeholders (marked `sync: false` in render.yaml so Render didn't generate them):
+     - `SendGrid__ApiKey` → the `SG.xxxxx...` key
+     - `SendGrid__FromAddress` → the verified sender email (e.g. `ljupco.semov@gmail.com`)
+     - `SendGrid__FromName` → `Customer Manager`
+   - **Save Changes** — Render auto-restarts the service.
 
-> Note the **double underscore** in env var names — ASP.NET Core maps `Smtp__Username` to the `Smtp:Username` config key.
+> Note the **double underscore** in env var names — ASP.NET Core maps `SendGrid__ApiKey` to the `SendGrid:ApiKey` config key.
 
 ### 4. Done
 
